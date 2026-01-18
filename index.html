@@ -4,78 +4,129 @@
 <meta charset="UTF-8">
 <title>Qazaq Sign AI</title>
 
+<!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <style>
 body {
-  font-family: Arial, sans-serif;
-  background: linear-gradient(135deg,#e0eafc,#cfdef3);
+  font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg,#e8f0ff,#fce8ff);
+  margin: 0;
+  padding: 0;
+}
+header {
+  padding: 20px;
   text-align: center;
-  padding: 20px;
-}
-
-.container {
-  background: white;
-  max-width: 420px;
-  margin: auto;
-  padding: 20px;
-  border-radius: 20px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-}
-
-video, canvas {
-  width: 100%;
-  border-radius: 15px;
-}
-
-#result {
-  font-size: 22px;
-  margin: 15px 0;
+  font-size: 26px;
   font-weight: bold;
 }
-
-#avatar {
-  display: none;
+.container {
+  max-width: 420px;
+  margin: auto;
+  background: white;
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+}
+.section {
+  margin-bottom: 20px;
+}
+.section h3 {
+  margin-bottom: 8px;
+}
+input, button {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  margin-top: 6px;
+  border-radius: 12px;
+  border: 1px solid #ccc;
+}
+button {
+  background: #4f46e5;
+  color: white;
+  border: none;
+}
+video, canvas {
+  width: 100%;
+  border-radius: 16px;
+  margin-top: 10px;
+}
+#result {
+  font-size: 22px;
+  font-weight: bold;
+  text-align: center;
+  margin-top: 10px;
+}
+footer {
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.6;
+  margin-top: 10px;
 }
 </style>
 </head>
 
 <body>
 
+<header>🤖 Qazaq Sign AI</header>
+
 <div class="container">
-  <h2>🤖 Qazaq Sign AI</h2>
-  <p>Қолмен жест көрсет</p>
 
-  <video id="video" autoplay></video>
-  <canvas id="canvas"></canvas>
+  <!-- TEXT → SIGN -->
+  <div class="section">
+    <h3>✍️ Қазақша сөз → Жест</h3>
+    <input id="textInput" placeholder="Мысалы: сәлем">
+    <button onclick="textToSign()">Аудару</button>
+    <video id="avatar" controls></video>
+  </div>
 
-  <div id="result">Жест күтілуде…</div>
+  <!-- CAMERA → TEXT -->
+  <div class="section">
+    <h3>📷 Жест → Қазақша сөз</h3>
+    <video id="camera" autoplay muted></video>
+    <canvas id="canvas"></canvas>
+    <div id="result">Күтілуде…</div>
+  </div>
 
-  <video id="avatar" controls></video>
 </div>
 
+<footer>
+AI-assisted prototype • Kazakh Sign Language
+</footer>
+
 <script>
-const videoElement = document.getElementById("video");
-const canvasElement = document.getElementById("canvas");
-const ctx = canvasElement.getContext("2d");
-const resultText = document.getElementById("result");
+// TEXT → SIGN
 const avatar = document.getElementById("avatar");
-
-canvasElement.width = 400;
-canvasElement.height = 300;
-
-// 👤 Аватар видеолары (MVP)
-const avatarVideos = {
-  "СӘЛЕМ": "https://www.signingsavvy.com/media/mp4-ld/1/1678.mp4",
-  "РАХМЕТ": "https://www.signingsavvy.com/media/mp4-ld/1/1906.mp4",
-  "ИӘ": "https://www.signingsavvy.com/media/mp4-ld/1/1267.mp4",
-  "ЖОҚ": "https://www.signingsavvy.com/media/mp4-ld/1/1252.mp4"
+const dict = {
+  "сәлем": "https://www.signingsavvy.com/media/mp4-ld/1/1678.mp4",
+  "рахмет": "https://www.signingsavvy.com/media/mp4-ld/1/1906.mp4",
+  "иә": "https://www.signingsavvy.com/media/mp4-ld/1/1267.mp4",
+  "жоқ": "https://www.signingsavvy.com/media/mp4-ld/1/1252.mp4"
 };
 
+function textToSign() {
+  const word = textInput.value.toLowerCase().trim();
+  if (dict[word]) {
+    avatar.src = dict[word];
+    avatar.play();
+  } else {
+    alert("Бұл сөз MVP базасында жоқ");
+  }
+}
+
+// CAMERA → TEXT
+const camEl = document.getElementById("camera");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const result = document.getElementById("result");
+
+canvas.width = 400;
+canvas.height = 300;
+
 const hands = new Hands({
-  locateFile: (file) =>
-    `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
 });
 
 hands.setOptions({
@@ -84,44 +135,23 @@ hands.setOptions({
   minTrackingConfidence: 0.7
 });
 
-let lastWord = "";
-
-hands.onResults(results => {
-  ctx.clearRect(0,0,canvasElement.width,canvasElement.height);
-  ctx.drawImage(videoElement,0,0,canvasElement.width,canvasElement.height);
-
-  if (results.multiHandLandmarks) {
-    const lm = results.multiHandLandmarks[0];
-
-    let word = "СӘЛЕМ";
-
-    const thumbUp = lm[4].y < lm[3].y;
-    const thumbDown = lm[4].y > lm[3].y;
-    const fist = lm[8].y > lm[6].y && lm[12].y > lm[10].y;
-
-    if (thumbUp) word = "ИӘ";
-    else if (thumbDown) word = "ЖОҚ";
-    else if (fist) word = "РАХМЕТ";
-
-    resultText.innerText = word;
-
-    if (word !== lastWord) {
-      avatar.src = avatarVideos[word];
-      avatar.style.display = "block";
-      avatar.play();
-      lastWord = word;
-    }
+hands.onResults(res => {
+  ctx.drawImage(camEl,0,0,canvas.width,canvas.height);
+  if (res.multiHandLandmarks) {
+    const lm = res.multiHandLandmarks[0];
+    if (lm[4].y < lm[3].y) result.innerText = "ИӘ 👍";
+    else if (lm[8].y > lm[6].y) result.innerText = "РАХМЕТ ✊";
+    else result.innerText = "СӘЛЕМ ✋";
   }
 });
 
-const camera = new Camera(videoElement,{
+const camera = new Camera(camEl,{
   onFrame: async () => {
-    await hands.send({image: videoElement});
+    await hands.send({image: camEl});
   },
   width: 400,
   height: 300
 });
-
 camera.start();
 </script>
 
